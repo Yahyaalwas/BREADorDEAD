@@ -1,0 +1,16 @@
+# Render blueprint: one web service that builds the client and serves it from
+# the same Express process that runs the game rooms.
+services:
+  - type: web
+    name: bread-or-dead
+    runtime: node
+    plan: free
+    region: frankfurt          # oregon | ohio | frankfurt | singapore
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production

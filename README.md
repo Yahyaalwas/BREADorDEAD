@@ -164,11 +164,37 @@ still the only way to confirm Safari-specific behaviour.
 
 ## Deploying
 
-Any Node host works, because the server also serves the built client:
+The server serves the built client, so the whole game is one process:
 
 ```bash
 npm install && npm run build && npm start      # honours $PORT
 ```
+
+### Render (simplest)
+
+`render.yaml` is a blueprint — point Render at the repo, hit **Apply**, done.
+WebSockets work on the free plan. Two things to know: a free instance sleeps
+after 15 minutes idle, so the next visitor waits ~50 seconds, and because rooms
+live in memory a sleep or redeploy ends any game in progress. Change `region` in
+`render.yaml` to whichever of `oregon`/`ohio`/`frankfurt`/`singapore` is nearest
+your players.
+
+### Fly.io (better latency, always on)
+
+```bash
+fly launch --copy-config --no-deploy
+fly deploy
+```
+
+`fly.toml` pins `primary_region = "bom"` (Mumbai) because it is the closest
+region to the Gulf — worth caring about for a 20Hz real-time game — and keeps one
+machine running so in-memory rooms survive. `fly regions list` shows the rest.
+
+### Not Vercel
+
+Socket.io needs a long-lived process and Vercel's functions are serverless, so a
+Vercel deploy gives you solo mode only. Deploy `client/dist` there as a static
+site if a solo-only link is useful, and put the real game on Render or Fly.
 
 Split hosting works too — deploy `client/dist` as a static site and set
 `VITE_SERVER_URL` at build time to point at the Node server.
