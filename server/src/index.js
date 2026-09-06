@@ -4,6 +4,7 @@
 // runs every room's authoritative simulation.
 
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -171,8 +172,25 @@ setInterval(() => {
   }
 }, 15_000).unref();
 
+/** Addresses a phone on the same network can actually reach. */
+function lanAddresses() {
+  const out = [];
+  for (const iface of Object.values(os.networkInterfaces())) {
+    for (const net of iface || []) {
+      if (net.family === 'IPv4' && !net.internal) out.push(net.address);
+    }
+  }
+  return out;
+}
+
+// No explicit host: Node's default already listens on every interface, which is
+// what a phone on the same Wi-Fi needs, and it does not fight port forwarders
+// that have already claimed IPv4 0.0.0.0.
 server.listen(PORT, () => {
   console.log(`🍞 Bread or Dead server listening on http://localhost:${PORT}`);
+  for (const address of lanAddresses()) {
+    console.log(`   on this network:            http://${address}:${PORT}`);
+  }
 });
 
 export { app, server, io };

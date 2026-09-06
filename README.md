@@ -35,6 +35,47 @@ drawer, and the Moldy Slice's five abilities are behind one **⚡** button.
 Landscape is the intended orientation; portrait shows a rotate prompt during play
 but the menus and lobby work either way.
 
+## Testing it on your phone
+
+The phone and the computer running the game must be on the same Wi-Fi.
+
+```bash
+git clone https://github.com/Yahyaalwas/BREADorDEAD
+cd BREADorDEAD
+npm install
+npm run dev
+```
+
+Vite prints a **Network** line — `http://192.168.x.x:5173/` — and the game server
+prints its own `on this network` line. Open the Vite one on your phone. Both
+servers listen on every interface, so nothing else needs configuring.
+
+For multiplayer, open that same URL on every phone: one taps **Create room** and
+reads out the 4-letter code, the rest type it into **Join**. Four slices minimum.
+
+To test the production build instead (one process, the way it deploys):
+
+```bash
+npm run preview        # builds the client, serves everything from :3000
+```
+
+then open `http://192.168.x.x:3000` on the phone.
+
+**Two caveats over plain LAN HTTP.** `navigator.share` and the clipboard need a
+secure context, so the share button falls back silently — everything else works.
+And if the phone cannot reach the address, it is almost always the computer's
+firewall (macOS: System Settings → Network → Firewall) or an "AP isolation"
+setting on a guest Wi-Fi network.
+
+For testing over cellular, or to hand the link to someone else, tunnel it:
+
+```bash
+npx cloudflared tunnel --url http://localhost:3000     # prints an https URL
+```
+
+That gives a real HTTPS origin, so share, clipboard and iOS audio all behave the
+way they would in production.
+
 ## Controls
 
 | Key | Action |

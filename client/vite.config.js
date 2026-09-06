@@ -9,6 +9,8 @@ export default defineConfig({
   // shared/ lives outside client/, so Vite needs permission to serve it in dev.
   server: {
     port: 5173,
+    // Bind every interface so a phone on the same Wi-Fi can reach the dev server.
+    host: true,
     fs: { allow: [root, path.resolve(root, '..', 'shared')] },
     proxy: {
       '/socket.io': { target: 'http://localhost:3000', ws: true },
