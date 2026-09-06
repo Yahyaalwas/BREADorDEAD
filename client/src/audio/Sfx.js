@@ -65,7 +65,12 @@ function chord(freqs, { dur = 0.9, type = 'sawtooth', gain = 0.14 } = {}) {
 export const Sfx = {
   setEnabled(v) { enabled = !!v; },
   toggle() { enabled = !enabled; return enabled; },
-  unlock() { audio(); },
+  unlock() {
+    // Cheap no-op once the context is running, so it can be called on every tap.
+    if (ctx && ctx.state === 'running') return;
+    audio();
+  },
+  get running() { return !!ctx && ctx.state === 'running'; },
 
   hop()        { noise({ dur: 0.12, gain: 0.18, filter: 420 }); tone({ freq: 180, slideTo: 90, dur: 0.12, type: 'triangle', gain: 0.14 }); },
   land()       { noise({ dur: 0.08, gain: 0.12, filter: 300 }); },

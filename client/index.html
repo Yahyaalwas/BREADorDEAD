@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#120d09" />
   <title>Bread or Dead</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🍞</text></svg>" />
   <style>
@@ -16,23 +20,39 @@
       color-scheme: dark;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #120d09; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden; background: #120d09;
+      /* iOS Safari: 100% of a fixed body is stable where 100vh is not (the URL
+         bar makes vh lie), and dvh covers the browsers that support it. */
+      height: 100dvh;
+      overscroll-behavior: none;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+    }
     body {
       font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
       color: var(--crumb);
       -webkit-font-smoothing: antialiased;
     }
-    #game { position: fixed; inset: 0; }
+    #game { position: fixed; inset: 0; touch-action: none; }
     #game canvas { display: block; }
 
     .layer {
       position: fixed; inset: 0;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       display: none;
       pointer-events: none;
     }
     .layer.on { display: block; }
+    #menu, #gameover, #meeting { z-index: 20; }
     .layer.center { display: none; place-items: center; }
-    .layer.center.on { display: grid; pointer-events: auto; overflow: auto; padding: 16px; }
+    .layer.center.on {
+      display: grid; pointer-events: auto; overflow: auto;
+      padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+               calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+    }
 
     .panel {
       background: var(--panel);
@@ -167,6 +187,9 @@
     #meeting { background: rgba(10,7,4,.86); backdrop-filter: blur(4px); }
     #meeting.on { display: grid; place-items: center; pointer-events: auto; }
     .meeting-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; width: min(94vw, 900px); }
+    /* Grid children default to min-width:auto and refuse to shrink, which spills
+       the vote column out of the panel on narrow screens. */
+    .meeting-grid > * { min-width: 0; }
     @media (max-width: 720px) { .meeting-grid { grid-template-columns: 1fr; } }
     .vote-list { display: grid; gap: 8px; max-height: 46vh; overflow-y: auto; }
     .vote-row {
@@ -194,6 +217,180 @@
     .winner { font-size: clamp(28px, 6vw, 52px); font-weight: 900; letter-spacing: 3px; margin: 0 0 6px; }
     .winner.fresh { color: #ffd98a; }
     .winner.moldy { color: var(--mold); }
+
+
+    /* ---- touch controls ---- */
+    #touch { z-index: 5; }
+    /* Steering zones sit under the top bar and above the thumb buttons, so a
+       steer never lands on a HUD control. */
+    .zone {
+      position: absolute; top: 52px; bottom: 0; width: 34%;
+      pointer-events: auto; touch-action: none;
+      display: grid; place-items: center;
+      font-size: 40px; color: #fff3d6;
+      opacity: .16; transition: opacity .15s, background .15s;
+      background: linear-gradient(var(--dir, 90deg), rgba(255,243,214,.10), transparent 60%);
+    }
+    .zone-left { left: 0; --dir: 90deg; }
+    .zone-right { right: 0; --dir: 270deg; }
+    .zone.held { opacity: .42; background: rgba(255,243,214,.14); }
+    /* The hint fades out once play starts; the zone stays live. */
+    #touch.settled .zone { opacity: .05; }
+    #touch.settled .zone.held { opacity: .38; }
+
+    #touch .pad-right {
+      position: absolute; right: 10px; bottom: 10px;
+      display: grid; gap: 8px; justify-items: end;
+    }
+    .tbtn {
+      pointer-events: auto; touch-action: none;
+      min-width: 60px; min-height: 60px; border-radius: 50%;
+      background: rgba(28, 20, 14, .78);
+      border: 2px solid var(--stroke); color: var(--crumb);
+      font: 700 13px/1 "Trebuchet MS", sans-serif; letter-spacing: .5px;
+      display: grid; place-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #btn-hop {
+      position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+      width: 88px; height: 88px; font-size: 17px;
+      background: linear-gradient(180deg, rgba(224,164,92,.95), rgba(181,121,60,.95));
+      color: #2a1d12; border-color: #7d5227;
+    }
+    .tbtn.held { filter: brightness(1.5); }
+    #btn-hop.held { transform: translateX(-50%) scale(.94); }
+
+    /* ---- mobile top bar / drawer / sheet ---- */
+    #hud-mobilebar { display: none; }
+    .mbtn {
+      pointer-events: auto; touch-action: manipulation;
+      min-height: 44px; min-width: 46px; padding: 6px 12px;
+      border-radius: 12px; background: var(--panel); color: var(--crumb);
+      border: 2px solid var(--stroke); font: 700 15px/1 "Trebuchet MS", sans-serif;
+    }
+    .mbtn b { font-size: 12px; opacity: .75; }
+    #drawer-scrim {
+      position: fixed; inset: 0; z-index: 6; background: rgba(0,0,0,.5);
+      opacity: 0; pointer-events: none; transition: opacity .18s;
+    }
+    body.drawer-open #drawer-scrim, body.sheet-open #drawer-scrim { opacity: 1; pointer-events: auto; }
+    body.drawer-open #touch .zone, body.sheet-open #touch .zone { pointer-events: none; }
+
+    /* ---- phones and other coarse pointers ---- */
+    @media (pointer: coarse), (max-width: 820px) {
+      #hud-mobilebar {
+        display: flex; align-items: center; gap: 8px;
+        top: 6px; left: 8px; right: 8px; height: 48px;
+      }
+      #hud-top { top: 10px; }
+      .timer { font-size: 17px; padding: 5px 14px; }
+      .taskbar { width: min(42vw, 220px); height: 8px; }
+
+      /* Tasks become a drawer instead of a permanent panel. */
+      #hud-tasks {
+        position: fixed; top: 0; left: 0; bottom: 0; width: min(78vw, 300px);
+        border-radius: 0 16px 16px 0; padding: 16px 14px;
+        padding-top: calc(16px + env(safe-area-inset-top));
+        transform: translateX(-102%); transition: transform .2s ease;
+        pointer-events: auto; overflow-y: auto; z-index: 8;
+      }
+      body.drawer-open #hud-tasks { transform: none; }
+      #hud-tasks .task-hint { display: block; }
+
+      /* Abilities become a bottom sheet behind one button. */
+      #hud-abilities {
+        position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: none;
+        background: var(--panel); border-top: 2px solid var(--stroke);
+        border-radius: 18px 18px 0 0;
+        padding: 14px 12px calc(14px + env(safe-area-inset-bottom));
+        justify-content: center; flex-wrap: wrap; gap: 10px;
+        transition: transform .2s ease; z-index: 8;
+      }
+      #hud-abilities:not(.open) { transform: translateY(105%); }
+      .ability { width: 84px; height: 76px; }
+
+      /* Role and SCREAM are moved into the top bar by MobileUI, so they lay out
+         as flex children rather than escaping into the layer's flow. */
+      #hud-mobilebar #hud-role {
+        position: static; margin-left: auto; padding: 6px 10px;
+        font-size: 11px; text-align: right; background: var(--panel);
+        border: 2px solid var(--stroke); border-radius: 12px;
+      }
+      #hud-mobilebar #hud-role .muted { display: none; }
+      #hud-mobilebar #hud-actions { position: static; flex-direction: row; }
+      #hud-actions button { min-height: 44px; padding: 8px 12px; font-size: 13px; }
+      /* Very narrow screens: the role chip shrinks to its badge alone. */
+      @media (max-width: 430px) {
+        #hud-mobilebar #hud-role { font-size: 10px; padding: 6px; }
+      }
+      /* Reporting a body is contextual, so it gets the loud bottom slot. */
+      #btn-report:not([hidden]) {
+        position: fixed; left: 12px; right: 12px; bottom: calc(108px + env(safe-area-inset-bottom));
+        width: auto; min-height: 48px; font-size: 16px;
+      }
+      #hud-log { bottom: calc(110px + env(safe-area-inset-bottom)); font-size: 12px; }
+      .banner { font-size: clamp(18px, 4.4vw, 30px); top: 24%; }
+
+      /* Meeting goes full-bleed and stacks. */
+      #meeting .panel {
+        max-width: none; width: 100%; max-height: none; height: 100%;
+        border-radius: 0; border: 0; padding: 12px 14px;
+        padding-bottom: calc(118px + env(safe-area-inset-bottom));
+        display: flex; flex-direction: column;
+      }
+      .meeting-grid { grid-template-columns: 1fr; gap: 10px; flex: 1; min-height: 0; }
+      .meeting-grid > div:last-child { display: flex; flex-direction: column; min-height: 0; }
+      #chat-log { height: auto; flex: 0 0 auto; max-height: 24vh; }
+      /* The vote list is the part that scrolls; Skip must never scroll away. */
+      .vote-list { max-height: none; flex: 1; overflow-y: auto; }
+      .vote-row { min-height: 48px; }
+      /* Two fixed bars ride above the keyboard: --kb comes from visualViewport. */
+      #chat-form {
+        position: fixed; left: 0; right: 0;
+        bottom: calc(env(safe-area-inset-bottom) + var(--kb, 0px) + 56px);
+        margin: 0; padding: 8px 12px; background: var(--panel);
+        border-top: 2px solid var(--stroke); z-index: 2;
+      }
+      #chat-form input { font-size: 16px; }   /* under 16px and iOS zooms the page */
+      #btn-skip {
+        position: fixed; left: 12px; right: 12px; width: auto;
+        bottom: calc(env(safe-area-inset-bottom) + var(--kb, 0px) + 6px);
+        margin: 0; min-height: 46px; font-size: 16px; z-index: 2;
+      }
+      button, .btn { touch-action: manipulation; }
+    }
+
+    /* Landscape phones are short: give the vertical space back. */
+    @media (pointer: coarse) and (max-height: 480px) {
+      .zone { top: 46px; }
+      .tbtn { min-width: 52px; min-height: 52px; font-size: 11px; }
+      #btn-hop { width: 72px; height: 72px; font-size: 14px; }
+      #chat-log { max-height: 20vh; }
+      /* Landscape phones are wide enough for two columns, and the vertical
+         space matters more than the stacking. Skip rejoins its column; only the
+         chat input stays fixed, because that is what the keyboard covers. */
+      #meeting .panel { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+      #meeting h2 { font-size: 15px; margin-bottom: 6px; }
+      .meeting-grid { grid-template-columns: 1.2fr 1fr; }
+      .meeting-grid > div { display: flex; flex-direction: column; min-height: 0; }
+      #chat-log { flex: 1; max-height: none; min-height: 60px; }
+      #chat-form { bottom: calc(env(safe-area-inset-bottom) + var(--kb, 0px)); }
+      #btn-skip { position: static; margin-top: 8px; left: auto; right: auto; }
+      #hud-log { bottom: calc(92px + env(safe-area-inset-bottom)); }
+    }
+
+    #rotate {
+      position: fixed; inset: 0; z-index: 40; display: none;
+      place-items: center; text-align: center; background: rgba(10,7,4,.96);
+      pointer-events: auto; padding: 24px;
+    }
+    #rotate.on { display: grid; }
+    #rotate .phone {
+      width: 54px; height: 92px; margin: 0 auto 18px;
+      border: 4px solid var(--crumb); border-radius: 10px; opacity: .8;
+      animation: tip 1.6s ease-in-out infinite;
+    }
+    @keyframes tip { 0%, 40% { transform: none; } 70%, 100% { transform: rotate(90deg); } }
 
     .kbd {
       display: inline-block; background: rgba(255,255,255,.08); border: 1px solid var(--stroke);
@@ -233,6 +430,11 @@
           <span class="kbd">C</span> coo &nbsp;·&nbsp;
           <span class="kbd">Q</span> scream
         </p>
+        <p class="help" id="touch-help" hidden>
+          Hold a <b>side of the screen</b> to tilt that way and flop forward ·
+          hold <b>both sides</b> to run straight · <b>HOP</b> to jump ·
+          <b>GRAB</b> for crumbs and bodies · <b>COO</b> in the bread box
+        </p>
       </div>
 
       <div id="menu-lobby" class="stack" hidden>
@@ -262,8 +464,26 @@
       <button id="btn-scream" class="danger">SCREAM!</button>
       <button id="btn-report" class="ghost" hidden>REPORT</button>
     </div>
+    <div class="corner" id="hud-mobilebar">
+      <button class="mbtn" id="btn-drawer" aria-label="Tasks">☰ <b id="tasks-badge">0/4</b></button>
+      <button class="mbtn" id="btn-sheet" aria-label="Abilities" hidden>⚡</button>
+    </div>
+    <div id="drawer-scrim"></div>
     <div class="corner" id="hud-log"></div>
     <div class="banner" id="hud-banner" hidden></div>
+  </div>
+
+  <!-- Touch controls (shown only on touch devices) --------------------- -->
+  <div id="touch" class="layer">
+    <!-- Steering zones: holding a side applies torque that way and keeps the
+         slice flopping forward, mirroring A/D + W on a keyboard. -->
+    <div class="zone zone-left" data-zone="left" aria-label="Tilt left"><span>◀</span></div>
+    <div class="zone zone-right" data-zone="right" aria-label="Tilt right"><span>▶</span></div>
+    <div class="pad pad-right">
+      <button class="tbtn" data-hold="interact" aria-label="Coo">COO</button>
+      <button class="tbtn" data-tap="pickup" aria-label="Grab or report">GRAB</button>
+    </div>
+    <button class="tbtn big" id="btn-hop" data-hold="hop" aria-label="Hop">HOP</button>
   </div>
 
   <!-- Meeting ------------------------------------------------------------ -->
@@ -295,8 +515,18 @@
       <p class="muted" id="win-reason"></p>
       <div id="win-roles" class="stack" style="margin:16px 0"></div>
       <div class="row">
+        <button id="btn-share" class="ghost">Share result</button>
         <button id="btn-again">Back to menu</button>
       </div>
+      <p class="muted" id="share-note"></p>
+    </div>
+  </div>
+
+  <div id="rotate">
+    <div>
+      <div class="phone"></div>
+      <h2>Turn your phone</h2>
+      <p class="muted">Bread or Dead wants landscape. There is a lot of counter.</p>
     </div>
   </div>
 

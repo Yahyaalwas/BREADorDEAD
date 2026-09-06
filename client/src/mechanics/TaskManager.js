@@ -102,11 +102,13 @@ export class TaskManager {
   burstAt(scene, playerId, color, count) {
     const bread = scene.breads.get(playerId);
     if (!bread) return;
+    // Phone screens shrink everything; effects need to stay legible.
+    const big = scene.compactLabels ? 2 : 1;
     const p = scene.add.particles(bread.x, bread.y, 'spark', {
       speed: { min: 60, max: 220 },
       lifespan: 500,
       quantity: count,
-      scale: { start: 1.2, end: 0 },
+      scale: { start: 1.2 * big, end: 0 },
       tint: color,
       emitting: false,
     }).setDepth(30);

@@ -23,6 +23,18 @@ For a production-shaped run (one process serving everything):
 npm run preview      # builds the client, then serves it from Express on :3000
 ```
 
+## Phones
+
+Playable on a touch screen with no keyboard. Hold either **side of the screen**
+to tilt that way and keep flopping forward — torque alone would only spin you on
+the spot, so a steering zone supplies the thrust too. Hold **both sides** and the
+torques cancel: that is how you run in a straight line. **HOP** is bottom-centre,
+**GRAB** and **COO** sit under your right thumb, tasks live behind the **☰**
+drawer, and the Moldy Slice's five abilities are behind one **⚡** button.
+
+Landscape is the intended orientation; portrait shows a rotate prompt during play
+but the menus and lobby work either way.
+
 ## Controls
 
 | Key | Action |
@@ -34,6 +46,9 @@ npm run preview      # builds the client, then serves it from Express on :3000
 | `C` | coo (hold) |
 | `Q` | SCREAM — call an emergency meeting, once per game |
 | `1`–`5` | moldy abilities |
+
+On touch: left/right screen zone = torque + forward, both zones = straight,
+HOP / GRAB / COO buttons, ☰ tasks, ⚡ abilities.
 
 ## The kitchen
 
@@ -87,6 +102,24 @@ not earned them — only the moldy slice, the dead, and the end screen see them.
 No image or audio files: sprites come from Phaser's Graphics API at boot, and
 sounds are synthesised with the Web Audio API. No database either — rooms live
 in memory and are swept a minute after the last slice leaves.
+
+## Mobile notes
+
+Everything is sized for a thumb: 44pt minimum tap targets, safe-area padding for
+the notch and home indicator, and 16px chat input (anything smaller makes iOS
+zoom the page). The chat bar is fixed and tracks `visualViewport`, so the
+software keyboard pushes it up instead of burying it. Audio unlocks on the first
+gesture and keeps retrying until the `AudioContext` is actually running, and
+`localStorage` is wrapped — Safari private mode throws on it.
+
+The canvas renders at CSS resolution rather than 2–3x device pixels, which is
+what keeps frame rates sane on phones. Game time comes from the wall clock, so a
+device that drops to 20fps still runs 60-second rounds in 60 seconds.
+
+**Tested** on emulated iPhone SE / 14 / 15 Pro Max and Pixel 7 (Chromium device
+emulation): layout, tap targets, multi-touch, drawer, meeting and voting all
+pass. That is not the same as WebKit — a real iPhone or the iOS Simulator is
+still the only way to confirm Safari-specific behaviour.
 
 ## Deploying
 

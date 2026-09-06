@@ -98,6 +98,11 @@ export class KitchenMap {
     g.strokeRect(5, 5, WORLD.WIDTH - 10, WORLD.HEIGHT - 10);
   }
 
+  /** Zone captions are noise on a phone-sized canvas. */
+  setLabelsVisible(visible) {
+    for (const l of this.labels) l.setVisible(visible);
+  }
+
   drawZone(g, z, color, alpha, extra) {
     g.fillStyle(color, alpha);
     g.fillRoundedRect(z.x, z.y, z.w, z.h, 16);

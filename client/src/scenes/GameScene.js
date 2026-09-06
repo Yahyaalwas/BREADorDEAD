@@ -5,6 +5,8 @@ import MoldyBread from '../entities/MoldyBread.js';
 import { TaskManager } from '../mechanics/TaskManager.js';
 import { SabotageManager } from '../mechanics/SabotageManager.js';
 import { HUD } from '../ui/HUD.js';
+import { TouchControls } from '../ui/TouchControls.js';
+import { MobileUI } from '../ui/MobileUI.js';
 import { Sfx } from '../audio/Sfx.js';
 import {
   WORLD, ZONES, ANT_PATH, ANT_SPEED, GAME_STATE, ROLE, BREAD_COLORS,
@@ -50,10 +52,31 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(this.fitZoom());
     this.scale.on('resize', () => this.cameras.main.setZoom(this.fitZoom()));
 
+    // Phones hide the zone captions and thin out name labels.
+    this.compactLabels = window.innerWidth < 820 || TouchControls.isTouchDevice;
+    if (this.compactLabels) this.map.setLabelsVisible(false);
+
     this.hud = new HUD();
     this.hud.show();
     this.hud.onScream(() => this.doAction({ type: 'scream' }));
     this.hud.onReport(() => this.doAction({ type: 'report' }));
+
+    // Phones get thumb controls; the tap button doubles as grab and report.
+    this.touch = new TouchControls({
+      onTap: (action) => {
+        if (action === 'pickup') {
+          const snap = this.driver.snapshot();
+          const near = snap && snap.you && snap.bodies.some((b) => {
+            const me = snap.players.find((x) => x.id === this.myId);
+            return me && Phaser.Math.Distance.Between(me.x, me.y, b.x, b.y) < 110;
+          });
+          this.doAction({ type: near ? 'report' : 'pickup' });
+        }
+      },
+    });
+    this.mobile = new MobileUI({ onOverlayOpen: () => this.touch.releaseAll() });
+    this.isTouch = TouchControls.isTouchDevice;
+    if (this.isTouch) this.touch.show();
 
     this.tasks = new TaskManager(this);
     this.sabotage = new SabotageManager(this, (ability) =>
@@ -104,16 +127,17 @@ export default class GameScene extends Phaser.Scene {
 
   readInput() {
     const k = this.keys;
+    const t = this.touch.read();
     if (this.typingInChat()) {
       return { left: false, right: false, forward: false, back: false, hop: false, interact: false };
     }
     return {
-      left: k.left.isDown || k.arrowLeft.isDown,
-      right: k.right.isDown || k.arrowRight.isDown,
-      forward: k.up.isDown || k.arrowUp.isDown,
-      back: k.down.isDown || k.arrowDown.isDown,
-      hop: k.hop.isDown,
-      interact: k.coo.isDown,
+      left: k.left.isDown || k.arrowLeft.isDown || t.left,
+      right: k.right.isDown || k.arrowRight.isDown || t.right,
+      forward: k.up.isDown || k.arrowUp.isDown || t.forward,
+      back: k.down.isDown || k.arrowDown.isDown || t.back,
+      hop: k.hop.isDown || t.hop,
+      interact: k.coo.isDown || t.interact,
     };
   }
 
@@ -139,6 +163,7 @@ export default class GameScene extends Phaser.Scene {
     this.syncWorld(snap, dt);
 
     this.hud.update(snap);
+    if (this.isTouch) this.mobile.update(snap);
     this.tasks.update(snap, dt);
     this.sabotage.update(snap);
 
@@ -151,9 +176,20 @@ export default class GameScene extends Phaser.Scene {
   /** The meeting overlay lives in its own scene, running alongside this one. */
   syncMeetingScene(snap) {
     const inMeeting = snap.state === GAME_STATE.MEETING;
+
     if (inMeeting && !this.meetingScene) {
       this.scene.launch('Meeting', { driver: this.driver });
       this.meetingScene = this.scene.get('Meeting');
+    }
+    if (this.isTouch) {
+      // Steering zones must yield to any full-screen overlay — a meeting, and
+      // the results screen, whose buttons they would otherwise swallow.
+      if (snap.state === GAME_STATE.PLAYING) {
+        this.touch.show();
+      } else {
+        this.touch.hide();
+        this.mobile.reset();
+      }
     }
     if (inMeeting) {
       this.meetingScene?.setSnapshot?.(snap);
@@ -182,6 +218,11 @@ export default class GameScene extends Phaser.Scene {
         this.breads.set(p.id, bread);
         if (p.id === this.myId) this.cameras.main.startFollow(bread, true, 0.12, 0.12);
       }
+
+      // Small screens: only nearby names, or the labels become a wall of text.
+      bread.labelBudget = this.compactLabels;
+      const me = snap.players.find((x) => x.id === this.myId);
+      bread.labelNear = !me || Phaser.Math.Distance.Between(me.x, me.y, p.x, p.y) < 260;
 
       const view = p.id === this.myId ? this.predict(p, input, dt, snap) : p;
       bread.setProgress(this.tasks.progressFor(snap, p.id));
@@ -398,6 +439,8 @@ export default class GameScene extends Phaser.Scene {
 
   teardown() {
     this.hud.hide();
+    this.touch.destroy();
+    this.mobile.reset();
     this.sabotage.destroy();
     if (this.meetingScene) { this.scene.stop('Meeting'); this.meetingScene = null; }
     this.driver?.destroy?.();

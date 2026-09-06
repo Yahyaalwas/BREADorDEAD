@@ -39,6 +39,8 @@ export default class Bread extends Phaser.Physics.Arcade.Sprite {
     this.progress = 0;
     this.alive = true;
     this.wobblePhase = Math.random() * Math.PI * 2;
+    this.labelBudget = false;   // set by the scene on small screens
+    this.labelNear = false;
     this.lastZ = 0;
   }
 
@@ -83,6 +85,11 @@ export default class Bread extends Phaser.Physics.Arcade.Sprite {
     this.shadow.setScale(1 - hop * 0.45).setAlpha(0.35 - hop * 0.2);
 
     this.label.setPosition(p.x, p.y - lift - 40);
+    // On a phone every name at once is unreadable clutter, so a slice only
+    // introduces itself when it is close enough to matter.
+    if (this.labelBudget) {
+      this.label.setVisible(p.alive && (this.isLocal || this.labelNear));
+    }
     this.label.setColor(p.framed ? '#8fd96a' : (this.isLocal ? '#ffd98a' : '#fff3d6'));
 
     this.drawBar(p);
