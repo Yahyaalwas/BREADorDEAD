@@ -1,10 +1,7 @@
 import { io } from 'socket.io-client';
 import { EV } from '../../../shared/constants.js';
 
-/**
- * Socket wrapper for menu/lobby work plus the in-game NetDriver.
- * One socket lives for the whole page.
- */
+/** One socket for the page: lobby work plus the in-game NetDriver. */
 class Net {
   constructor() {
     this.socket = null;
@@ -31,40 +28,26 @@ class Net {
     return () => this.listeners.get(evt).delete(fn);
   }
 
-  fire(evt, data) {
-    for (const fn of this.listeners.get(evt) || []) fn(data);
+  fire(evt, data) { for (const fn of this.listeners.get(evt) || []) fn(data); }
+
+  createRoom(profile) {
+    return new Promise((resolve) => this.connect().emit(EV.ROOM_CREATE, profile, resolve));
   }
 
-  createRoom(name) {
-    return new Promise((resolve) => {
-      this.connect().emit(EV.ROOM_CREATE, { name }, resolve);
-    });
+  joinRoom(profile, code) {
+    return new Promise((resolve) => this.connect().emit(EV.ROOM_JOIN, { ...profile, code }, resolve));
   }
 
-  joinRoom(name, code) {
-    return new Promise((resolve) => {
-      this.connect().emit(EV.ROOM_JOIN, { name, code }, resolve);
-    });
-  }
-
+  customize(profile) { this.socket?.emit(EV.ROOM_CUSTOMIZE, profile); }
   startGame() {
-    return new Promise((resolve) => {
-      this.connect().emit(EV.ROOM_START, {}, resolve);
-    });
+    return new Promise((resolve) => this.connect().emit(EV.ROOM_START, {}, resolve));
   }
-
-  leaveRoom() {
-    this.socket?.emit(EV.ROOM_LEAVE);
-    this.lobby = null;
-  }
+  leaveRoom() { this.socket?.emit(EV.ROOM_LEAVE); this.lobby = null; }
 }
 
 export const net = new Net();
 
-/**
- * Drives GameScene from the authoritative server. The scene never mutates game
- * state itself; it sends inputs and renders whatever comes back.
- */
+/** Drives GameScene from the authoritative server. */
 export class NetDriver {
   constructor(socket, firstSnapshot) {
     this.socket = socket;
@@ -72,13 +55,11 @@ export class NetDriver {
     this.myId = socket.id;
     this.snap = firstSnapshot;
     this.events = [];
-    this.lastInputSent = 0;
     this.seq = 0;
 
     this.handlers = {
       [EV.GAME_STATE]: (s) => { this.snap = s; },
       [EV.GAME_EVENT]: (e) => this.events.push(e),
-      [EV.PLAYER_DIED]: (e) => this.events.push(e),
       [EV.MEETING_CALLED]: (e) => this.events.push(e),
       [EV.MEETING_RESULT]: (e) => this.events.push({ ...e, type: 'meeting:result' }),
       [EV.GAME_OVER]: (e) => this.events.push({ ...e, type: 'game:over' }),
@@ -87,27 +68,16 @@ export class NetDriver {
   }
 
   snapshot() { return this.snap; }
-
   update() { /* the server owns the simulation */ }
 
   sendInput(input) {
-    // Inputs are level-triggered, so a dropped packet self-corrects next tick.
-    this.socket.emit(EV.PLAYER_MOVE, { ...input, seq: ++this.seq });
+    // Level-triggered, so a dropped packet self-corrects on the next tick.
+    this.socket.emit(EV.PLAYER_MOVE, { dx: input.dx, dy: input.dy, seq: ++this.seq });
   }
 
-  action(a) {
-    if (a.type === 'sabotage') {
-      this.socket.emit(EV.PLAYER_SABOTAGE, { abilityId: a.ability, targetId: a.targetId });
-    } else if (a.type === 'scream' || a.type === 'report') {
-      this.socket.emit(EV.PLAYER_MEETING, { type: a.type === 'report' ? 'body' : 'scream' });
-    } else {
-      this.socket.emit(EV.PLAYER_TASK, { action: a.type, taskId: a.taskId });
-    }
-  }
-
+  action(a) { this.socket.emit(EV.PLAYER_ACTION, a); }
   vote(targetId) { this.socket.emit(EV.PLAYER_VOTE, { targetId }); }
   chat(text) { this.socket.emit(EV.PLAYER_CHAT, { text }); }
-
   drainEvents() { const e = this.events; this.events = []; return e; }
 
   destroy() {

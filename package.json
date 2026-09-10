@@ -1,10 +1,13 @@
 {
-  "name": "bread-or-dead",
+  "name": "sheeple",
   "version": "1.0.0",
   "private": true,
-  "description": "Bread or Dead — physics-based bread social deduction, in a kitchen.",
+  "description": "Sheeple \u2014 a farm full of sheep, one of them a wolf.",
   "type": "module",
-  "workspaces": ["client", "server"],
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
     "dev": "concurrently -n server,client -c yellow,cyan \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "npm --workspace server run dev",
@@ -16,5 +19,7 @@
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

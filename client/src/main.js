@@ -6,54 +6,101 @@ import SoloScene from './scenes/SoloScene.js';
 import MeetingScene from './scenes/MeetingScene.js';
 import { net, NetDriver } from './net/Net.js';
 import { Sfx } from './audio/Sfx.js';
-import { ROOM, BREAD_COLORS } from '../../shared/constants.js';
+import { ROOM, WOOL_COLORS, HATS, SHEEP_NAMES } from '../../shared/constants.js';
 
 const $ = (id) => document.getElementById(id);
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#120d09',
+  backgroundColor: '#0d1018',
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: '100%',
     height: '100%',
   },
-  physics: {
-    default: 'arcade',
-    // The bread simulation is our own; Arcade is here for bodies and overlaps.
-    arcade: { gravity: { y: 0 }, debug: false },
-  },
   scene: [BootScene, MenuScene, GameScene, SoloScene, MeetingScene],
 });
 
 // ---------------------------------------------------------------------------
-// Menu / lobby wiring
+// Profile: name, wool colour, hat
 // ---------------------------------------------------------------------------
 
-const NAME_KEY = 'bod:name';
-
-// Safari private mode (and locked-down Android browsers) can throw on any
-// storage access, so nothing on the critical path may assume it works.
+// Safari private mode throws on storage, so nothing may depend on it working.
 const storage = {
-  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
-  set(key, value) { try { localStorage.setItem(key, value); } catch { /* not important enough to break play */ } },
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* not worth breaking play */ } },
 };
 
-// Touch players get the thumb-control legend instead of the key legend.
-if ((navigator.maxTouchPoints || 0) > 0 || window.matchMedia('(pointer: coarse)').matches) {
-  document.querySelector('#menu-home .help').hidden = true;
-  $('touch-help').hidden = false;
-}
+const isTouch = () => (navigator.maxTouchPoints || 0) > 0 ||
+  window.matchMedia('(pointer: coarse)').matches;
+
+const profile = {
+  name: storage.get('sheeple:name') || '',
+  colorIndex: Number(storage.get('sheeple:color') || 0) || 0,
+  hatIndex: Number(storage.get('sheeple:hat') || 0) || 0,
+};
 
 const nameInput = $('name');
-nameInput.value = storage.get(NAME_KEY) || '';
-nameInput.addEventListener('change', () => storage.set(NAME_KEY, nameInput.value.trim()));
+nameInput.value = profile.name;
+nameInput.placeholder = SHEEP_NAMES[Math.floor(Math.random() * SHEEP_NAMES.length)];
+nameInput.addEventListener('change', () => {
+  profile.name = nameInput.value.trim();
+  storage.set('sheeple:name', profile.name);
+  net.customize(playerProfile());
+});
 
-function playerName() {
-  return (nameInput.value || '').trim().slice(0, 14) || 'Anon Loaf';
+function playerProfile() {
+  return {
+    name: (nameInput.value || '').trim().slice(0, 12) || nameInput.placeholder,
+    colorIndex: profile.colorIndex,
+    hatIndex: profile.hatIndex,
+  };
 }
+
+function buildPickers() {
+  const colors = $('colors');
+  colors.innerHTML = '';
+  WOOL_COLORS.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = `swatch-btn ${i === profile.colorIndex ? 'on' : ''}`;
+    b.style.background = `#${c.hex.toString(16).padStart(6, '0')}`;
+    b.title = c.name;
+    b.onclick = () => {
+      profile.colorIndex = i;
+      storage.set('sheeple:color', String(i));
+      buildPickers();
+      net.customize(playerProfile());
+    };
+    colors.appendChild(b);
+  });
+
+  const hats = $('hats');
+  hats.innerHTML = '';
+  HATS.forEach((h, i) => {
+    const b = document.createElement('button');
+    b.className = `hat-btn ${i === profile.hatIndex ? 'on' : ''}`;
+    b.textContent = h.name;
+    b.onclick = () => {
+      profile.hatIndex = i;
+      storage.set('sheeple:hat', String(i));
+      buildPickers();
+      net.customize(playerProfile());
+    };
+    hats.appendChild(b);
+  });
+}
+buildPickers();
+
+if (isTouch()) {
+  $('help-keys').hidden = true;
+  $('help-touch').hidden = false;
+}
+
+// ---------------------------------------------------------------------------
+// Menu flow
+// ---------------------------------------------------------------------------
 
 function showMenu(view = 'home') {
   $('menu').classList.add('on');
@@ -61,18 +108,18 @@ function showMenu(view = 'home') {
   $('menu-lobby').hidden = view !== 'lobby';
   $('gameover').classList.remove('on');
 }
-
-function hideMenu() {
-  $('menu').classList.remove('on');
-}
-
-function menuError(msg) { $('menu-error').textContent = msg || ''; }
-function lobbyError(msg) { $('lobby-error').textContent = msg || ''; }
+function hideMenu() { $('menu').classList.remove('on'); }
+const menuError = (m) => { $('menu-error').textContent = m || ''; };
+const lobbyError = (m) => { $('lobby-error').textContent = m || ''; };
 
 function stopGameScenes() {
   for (const key of ['Game', 'Solo', 'Meeting']) {
     if (game.scene.isActive(key) || game.scene.isPaused(key)) game.scene.stop(key);
   }
+}
+
+function inGame() {
+  return game.scene.isActive('Game') || game.scene.isActive('Solo');
 }
 
 function returnToMenu() {
@@ -82,51 +129,40 @@ function returnToMenu() {
   showMenu('home');
 }
 
-// --- solo -------------------------------------------------------------------
-
-/** Best-effort: iOS Safari refuses outside fullscreen, which is why it is guarded. */
 function tryLockLandscape() {
+  // iOS Safari refuses outside fullscreen, hence the rotate prompt as fallback.
   try { screen.orientation?.lock?.('landscape')?.catch?.(() => {}); } catch { /* unsupported */ }
 }
-
-/** Android's back gesture should leave the round, not the site. */
 function guardBackButton() {
-  try { history.pushState({ bod: 'game' }, ''); } catch { /* ignore */ }
+  try { history.pushState({ sheeple: 'game' }, ''); } catch { /* ignore */ }
 }
-window.addEventListener('popstate', () => {
-  if (inGame()) returnToMenu();
-});
+window.addEventListener('popstate', () => { if (inGame()) returnToMenu(); });
 
 $('btn-solo').onclick = () => {
-  Sfx.unlock();
-  tryLockLandscape();
-  guardBackButton();
+  Sfx.unlock(); tryLockLandscape(); guardBackButton();
   hideMenu();
   game.scene.stop('Menu');
-  game.scene.start('Solo', { name: playerName(), bots: 5 });
+  game.scene.start('Solo', { ...playerProfile(), bots: 6 });
 };
 
-// --- multiplayer ------------------------------------------------------------
-
 $('btn-create').onclick = async () => {
-  Sfx.unlock();
-  menuError('');
-  const res = await net.createRoom(playerName());
+  Sfx.unlock(); menuError('');
+  const res = await net.createRoom(playerProfile());
   if (!res?.ok) return menuError(res?.error || 'Could not create a room.');
   showMenu('lobby');
 };
 
 $('btn-join').onclick = async () => {
-  Sfx.unlock();
-  menuError('');
+  Sfx.unlock(); menuError('');
   const code = ($('join-code').value || '').toUpperCase().trim();
-  if (code.length !== ROOM.CODE_LENGTH) return menuError(`Room codes are ${ROOM.CODE_LENGTH} characters.`);
-  const res = await net.joinRoom(playerName(), code);
+  if (code.length !== ROOM.CODE_LENGTH) return menuError(`Room codes are ${ROOM.CODE_LENGTH} letters.`);
+  const res = await net.joinRoom(playerProfile(), code);
   if (!res?.ok) return menuError(res?.error || 'Could not join that room.');
   showMenu('lobby');
 };
 
 $('btn-leave').onclick = () => returnToMenu();
+$('btn-again').onclick = () => returnToMenu();
 
 $('btn-start').onclick = async () => {
   lobbyError('');
@@ -134,33 +170,28 @@ $('btn-start').onclick = async () => {
   if (!res?.ok) lobbyError(res?.error || 'Could not start.');
 };
 
-$('btn-again').onclick = () => returnToMenu();
-
 $('btn-share').onclick = async () => {
-  const title = $('win-title').textContent;
-  const text = `${title} in Bread or Dead. ${$('win-reason').textContent}`.trim();
+  const text = `${$('win-title').textContent} in Sheeple. ${$('win-reason').textContent}`.trim();
   const url = location.origin + location.pathname;
   try {
-    if (navigator.share) {
-      await navigator.share({ title: 'Bread or Dead', text, url });
-      return;
-    }
+    if (navigator.share) { await navigator.share({ title: 'Sheeple', text, url }); return; }
     await navigator.clipboard.writeText(`${text}\n${url}`);
     $('share-note').textContent = 'Copied. Go ruin a group chat.';
   } catch {
-    // A cancelled share sheet is not a failure worth shouting about.
-    $('share-note').textContent = '';
+    $('share-note').textContent = '';   // a cancelled share sheet is not an error
   }
 };
 
 net.on('lobby', (lobby) => {
   if (!lobby) return;
   $('lobby-code').textContent = lobby.code;
-  $('lobby-players').innerHTML = lobby.players.map((p, i) => {
-    const color = `#${BREAD_COLORS[i % BREAD_COLORS.length].toString(16).padStart(6, '0')}`;
+  $('lobby-players').innerHTML = lobby.players.map((p) => {
+    const c = WOOL_COLORS[(p.colorIndex ?? 0) % WOOL_COLORS.length];
+    const hat = HATS[(p.hatIndex ?? 0) % HATS.length];
     return `<div class="lobby-row">
-      <span class="swatch" style="background:${color}"></span>
+      <span class="swatch" style="background:#${c.hex.toString(16).padStart(6, '0')}"></span>
       <span>${escapeHtml(p.name)}</span>
+      <span class="muted">${hat.name}</span>
       ${p.isHost ? '<span style="margin-left:auto;opacity:.6">host</span>' : ''}
     </div>`;
   }).join('');
@@ -168,23 +199,20 @@ net.on('lobby', (lobby) => {
   const enough = lobby.players.length >= lobby.minPlayers;
   $('btn-start').disabled = !me?.isHost || !enough;
   $('lobby-hint').textContent = enough
-    ? (me?.isHost ? 'Start when everyone is in the kitchen.' : 'Waiting for the host…')
-    : `${lobby.players.length}/${lobby.minPlayers} slices — need ${lobby.minPlayers - lobby.players.length} more.`;
+    ? (me?.isHost ? 'Start when everyone is in.' : 'Waiting for the host…')
+    : `${lobby.players.length}/${lobby.minPlayers} sheep — need ${lobby.minPlayers - lobby.players.length} more.`;
 });
 
 net.on('error', (e) => {
-  const target = $('menu-lobby').hidden ? menuError : lobbyError;
-  target(e?.error || 'Something went stale.');
+  ($('menu-lobby').hidden ? menuError : lobbyError)(e?.error || 'Something went wrong.');
 });
 
 net.on('start', (snapshot) => {
-  tryLockLandscape();
-  guardBackButton();
+  tryLockLandscape(); guardBackButton();
   hideMenu();
   stopGameScenes();
   game.scene.stop('Menu');
-  const driver = new NetDriver(net.socket, snapshot);
-  game.scene.start('Game', { driver });
+  game.scene.start('Game', { driver: new NetDriver(net.socket, snapshot) });
 });
 
 net.on('disconnect', () => {
@@ -192,30 +220,21 @@ net.on('disconnect', () => {
     stopGameScenes();
     game.scene.start('Menu');
     showMenu('home');
-    menuError('Lost the connection to the kitchen.');
+    menuError('Lost the connection to the farm.');
   }
 });
 
 // ---------------------------------------------------------------------------
-// Mobile: orientation, and keeping Phaser's canvas honest about its own size
+// Mobile plumbing
 // ---------------------------------------------------------------------------
 
-const isTouch = () => (navigator.maxTouchPoints || 0) > 0 ||
-  window.matchMedia('(pointer: coarse)').matches;
-
-function inGame() {
-  return game.scene.isActive('Game') || game.scene.isActive('Solo');
-}
-
 function updateOrientation() {
-  // Portrait phones can still read the menus; it is the kitchen that needs width.
   const portrait = window.innerHeight > window.innerWidth;
   $('rotate').classList.toggle('on', isTouch() && portrait && inGame());
 }
 
 function refreshScale() {
-  // iOS Safari reports stale dimensions right after a rotate or a URL-bar
-  // collapse, so re-measure a beat later as well as immediately.
+  // iOS reports stale dimensions right after a rotate or a URL-bar collapse.
   game.scale.refresh();
   updateOrientation();
   setTimeout(() => { game.scale.refresh(); updateOrientation(); }, 300);
@@ -225,13 +244,11 @@ window.addEventListener('orientationchange', refreshScale);
 window.addEventListener('resize', updateOrientation);
 window.visualViewport?.addEventListener('resize', refreshScale);
 setInterval(updateOrientation, 1000);
-
-// Two-finger pinch and double-tap zoom would fight the canvas on iOS.
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
-// Safari blocks audio until a gesture, and a first attempt can still land while
-// the context is suspended — so keep trying on every gesture until it runs.
+// Safari blocks audio until a gesture, and the first attempt can land while the
+// context is still suspended — so retry on every gesture until it runs.
 for (const evt of ['pointerdown', 'touchend', 'keydown']) {
   window.addEventListener(evt, () => Sfx.unlock(), { passive: true });
 }

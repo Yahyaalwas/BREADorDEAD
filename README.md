@@ -1,166 +1,122 @@
-# 🍞 Bread or Dead
+# 🐑 Sheeple
 
-A physics-based social deduction game. You are a slice of bread on a kitchen
-counter. So is everybody else. One of you is mouldering.
+A farm full of sheep. One of them is a wolf in a wool coat.
 
-Bread does not walk. Left/right apply **torque**; the slice tilts, wobbles, and
-that tilt is what drags it across the counter. Spin too hard and you flop onto
-your face, where you are slow, useless and very obvious.
+Do your chores, watch everybody else, and when somebody turns up eaten, argue
+about it in the chat until you vote the wrong sheep over the fence.
+
+Plays in a browser, on a phone, with friends or against bots.
 
 ## Play
 
 ```bash
 npm install
-npm run dev          # Vite client on :5173, game server on :3000
+npm run dev          # client on :5173, game server on :3000
 ```
 
-Open http://localhost:5173. **Solo vs. AI** needs no server at all — the same
-simulation runs in the tab against five bots, one of which is secretly moldy.
+Open http://localhost:5173. **Play vs AI** needs no server at all — the same
+simulation runs in the tab against six bots, one of which is quietly the wolf.
 
-For a production-shaped run (one process serving everything):
-
-```bash
-npm run preview      # builds the client, then serves it from Express on :3000
-```
-
-## Phones
-
-Playable on a touch screen with no keyboard. Hold either **side of the screen**
-to tilt that way and keep flopping forward — torque alone would only spin you on
-the spot, so a steering zone supplies the thrust too. Hold **both sides** and the
-torques cancel: that is how you run in a straight line. **HOP** is bottom-centre,
-**GRAB** and **COO** sit under your right thumb, tasks live behind the **☰**
-drawer, and the Moldy Slice's five abilities are behind one **⚡** button.
-
-Landscape is the intended orientation; portrait shows a rotate prompt during play
-but the menus and lobby work either way.
+For multiplayer, one player hits **Create room** and reads out the 4-letter code;
+everyone else types it into **Join**. Four sheep minimum, ten maximum.
 
 ## Testing it on your phone
 
 The phone and the computer running the game must be on the same Wi-Fi.
-
-```bash
-git clone https://github.com/Yahyaalwas/BREADorDEAD
-cd BREADorDEAD
-npm install
-npm run dev
-```
-
-Vite prints a **Network** line — `http://192.168.x.x:5173/` — and the game server
-prints its own `on this network` line. Open the Vite one on your phone. Both
-servers listen on every interface, so nothing else needs configuring.
-
-For multiplayer, open that same URL on every phone: one taps **Create room** and
-reads out the 4-letter code, the rest type it into **Join**. Four slices minimum.
-
-To test the production build instead (one process, the way it deploys):
-
-```bash
-npm run preview        # builds the client, serves everything from :3000
-```
-
-then open `http://192.168.x.x:3000` on the phone.
-
-**Two caveats over plain LAN HTTP.** `navigator.share` and the clipboard need a
-secure context, so the share button falls back silently — everything else works.
-And if the phone cannot reach the address, it is almost always the computer's
-firewall (macOS: System Settings → Network → Firewall) or an "AP isolation"
-setting on a guest Wi-Fi network.
-
-For testing over cellular, or to hand the link to someone else, tunnel it:
+`npm run dev` prints a **Network** line — `http://192.168.x.x:5173/` — open that
+on the phone. Both servers listen on every interface, so nothing else needs
+configuring. For cellular, or to hand someone a link:
 
 ```bash
 npx cloudflared tunnel --url http://localhost:3000     # prints an https URL
 ```
 
-That gives a real HTTPS origin, so share, clipboard and iOS audio all behave the
-way they would in production.
+`navigator.share` and the clipboard need a secure context, so on plain LAN HTTP
+the share button quietly does nothing; everything else works.
 
 ## Controls
 
-| Key | Action |
-| --- | --- |
-| `W` / `S` | flop forward / back along your facing |
-| `A` / `D` | apply torque — this is how you turn, and how you fall over |
-| `SPACE` | hop (random spin on takeoff; the butter dish launches you) |
-| `E` | grab or drop a crumb / report a body |
-| `C` | coo (hold) |
-| `Q` | SCREAM — call an emergency meeting, once per game |
-| `1`–`5` | moldy abilities |
-
-On touch: left/right screen zone = torque + forward, both zones = straight,
-HOP / GRAB / COO buttons, ☰ tasks, ⚡ abilities.
-
-## The kitchen
-
-| Zone | What it does |
-| --- | --- |
-| **Toaster** | Stand in it 3s for Perfect Toast. 6s and you are dead. |
-| **Butter dish** | Almost no friction, and it launches a hopping slice. |
-| **Sink** | Soggy: half speed, and you leave a wet trail. |
-| **Bread box** | Where you coo. |
-| **Ant trail** | Hop onto a passing ant for a fast ride; crumbs get delivered here. |
-| **Cutting board** | The butter knife patrols. Getting hit is a 10-second spread. |
-
-## Tasks (fresh bread)
-
-Perfect Toast · Crumbs to Ants · Bread Stack (3 slices piled for 5s) · Coo ·
-Avoid the Knife. Finish every task and fresh bread wins.
-
-## Abilities (the Moldy Slice)
-
-| Ability | Effect | Cooldown |
+| | Desktop | Phone |
 | --- | --- | --- |
-| Green Crumbs | Passive mold trail, 10s, slows fresh bread — and gives you away | passive |
-| Spore Burst | Controls inverted for 5s inside the cloud | 30s |
-| Crank the Toaster | Everyone has 10s to leave the toaster or burn | 45s |
-| Frame | Rub mold on a nearby slice; they look guilty for 30s | 20s |
-| Kill | Stay within 50px of a slice for 2s | 35s |
+| Move | `W` `A` `S` `D` or arrows | thumb stick, left half of the screen |
+| Do the thing you're standing on | `E` (hold for hold-chores) | the big round button |
+| Eat someone (wolf) | `SPACE` | EAT |
+| Hay tunnel (wolf) | `Q` | HAY |
+| Fog (wolf) | `F` | FOG |
 
-Rounds last 60 seconds and end in a meeting. Five rounds without finishing the
-tasks and the mold wins.
+One button covers everything contextual: it becomes **REPORT** over a body,
+**BELL** at the emergency bell, and the chore name when you're on a station.
+
+## The farm
+
+Six rooms joined by corridors — Pasture, Barn, Pond, Coop, Yard, Shed. You can
+only see a short way around yourself, so most of what you "know" is really what
+somebody told you in the last meeting.
+
+- **Chores** are twelve fixed stations; you get five at random. Some you hold,
+  some you tap. Finish every sheep's list and the sheep win.
+- **Hay bales** are wolf-only tunnels between rooms.
+- **The bell** in the barn calls a meeting — once per player, per game.
+
+## The wolf
+
+| Power | What it does | Cooldown |
+| --- | --- | --- |
+| Eat | Within 78px, one sheep becomes remains | 42s |
+| Hay tunnel | Dive into a bale, pop out of another | 18s |
+| Fog | Everybody's view closes in for 20s | 45s |
+
+The wolf leaves no trail and moves barely faster than a sheep. Its real problem
+is that sheep remember who they last saw you standing next to.
+
+## Meetings
+
+Somebody finds a body or rings the bell, everyone freezes and lands in the chat.
+75 seconds to accuse each other, then vote or skip. Quick-chat buttons mean a
+phone player can accuse someone with one thumb. The ejected sheep's role is
+revealed on the way over the fence.
+
+Sheep win by finishing every chore or ejecting the wolf. The wolf wins when
+there are as many wolves as sheep left.
 
 ## How it fits together
 
 ```
-shared/         constants.js · physics.js · GameSim.js   ← one rulebook
+shared/         constants.js · movement.js · GameSim.js   ← one rulebook
 server/src/     index.js · GameRoom.js · GameLoop.js · Player.js
 client/src/     scenes/ · entities/ · mechanics/ · ui/ · net/ · audio/
 ```
 
 `shared/GameSim.js` is the whole game as a headless, deterministic engine. The
 server runs one per room at 30 Hz and broadcasts snapshots at 20 Hz; solo mode
-runs the identical engine in the browser with `AIBread` brains supplying input.
-Nothing about the rules is written twice.
+runs the identical engine in the browser with `AISheep` brains supplying input.
+No rule is implemented twice.
 
-`shared/physics.js` is the bread stepper, shared three ways: the server uses it
-authoritatively, the client re-runs it for local prediction (then eases toward
-the server's answer), and the AI drives it the same way a player would.
+Every snapshot is filtered per viewer, so a client is never sent a role it has
+not earned — only the wolf, the dead, and the end screen see them.
 
-Every snapshot is filtered per viewer, so roles never reach a client that has
-not earned them — only the moldy slice, the dead, and the end screen see them.
+The map is a set of overlapping rectangles. Walkability is "the whole sheep fits
+inside the union", and pathfinding is a graph over those rectangles, so there is
+no grid, no tuning, and no way to get wedged in a corner.
 
-No image or audio files: sprites come from Phaser's Graphics API at boot, and
-sounds are synthesised with the Web Audio API. No database either — rooms live
-in memory and are swept a minute after the last slice leaves.
+No image or audio files: sprites come from Phaser's Graphics API at boot and
+every sound is synthesised with Web Audio. No database — rooms live in memory
+and are swept a minute after the last sheep leaves.
 
 ## Mobile notes
 
-Everything is sized for a thumb: 44pt minimum tap targets, safe-area padding for
-the notch and home indicator, and 16px chat input (anything smaller makes iOS
-zoom the page). The chat bar is fixed and tracks `visualViewport`, so the
-software keyboard pushes it up instead of burying it. Audio unlocks on the first
-gesture and keeps retrying until the `AudioContext` is actually running, and
-`localStorage` is wrapped — Safari private mode throws on it.
+44pt minimum tap targets, safe-area padding for the notch and home indicator,
+16px chat input (anything smaller makes iOS zoom the page), and a chat bar that
+tracks `visualViewport` so the keyboard pushes it up instead of burying it.
+Audio unlocks on the first gesture and keeps retrying until the `AudioContext`
+actually runs; `localStorage` is wrapped, because Safari private mode throws.
 
-The canvas renders at CSS resolution rather than 2–3x device pixels, which is
-what keeps frame rates sane on phones. Game time comes from the wall clock, so a
-device that drops to 20fps still runs 60-second rounds in 60 seconds.
+Game time comes from the wall clock, so a phone dropping to 20fps still plays a
+75-second meeting in 75 seconds.
 
-**Tested** on emulated iPhone SE / 14 / 15 Pro Max and Pixel 7 (Chromium device
-emulation): layout, tap targets, multi-touch, drawer, meeting and voting all
-pass. That is not the same as WebKit — a real iPhone or the iOS Simulator is
-still the only way to confirm Safari-specific behaviour.
+Tested on emulated iPhone SE / 14 and Pixel 7 (Chromium device emulation). That
+is not WebKit — a real iPhone is still the only way to confirm Safari-specific
+behaviour.
 
 ## Deploying
 
@@ -170,31 +126,12 @@ The server serves the built client, so the whole game is one process:
 npm install && npm run build && npm start      # honours $PORT
 ```
 
-### Render (simplest)
+**Render** — `render.yaml` is a blueprint: point Render at the repo and hit
+Apply. WebSockets work on the free plan; a free instance sleeps after 15 minutes
+idle, and because rooms live in memory a sleep ends any game in progress.
 
-`render.yaml` is a blueprint — point Render at the repo, hit **Apply**, done.
-WebSockets work on the free plan. Two things to know: a free instance sleeps
-after 15 minutes idle, so the next visitor waits ~50 seconds, and because rooms
-live in memory a sleep or redeploy ends any game in progress. Change `region` in
-`render.yaml` to whichever of `oregon`/`ohio`/`frankfurt`/`singapore` is nearest
-your players.
+**Fly.io** — `fly launch --copy-config --no-deploy && fly deploy`. `fly.toml`
+pins `bom` (Mumbai) as the closest region to the Gulf and keeps one machine up.
 
-### Fly.io (better latency, always on)
-
-```bash
-fly launch --copy-config --no-deploy
-fly deploy
-```
-
-`fly.toml` pins `primary_region = "bom"` (Mumbai) because it is the closest
-region to the Gulf — worth caring about for a 20Hz real-time game — and keeps one
-machine running so in-memory rooms survive. `fly regions list` shows the rest.
-
-### Not Vercel
-
-Socket.io needs a long-lived process and Vercel's functions are serverless, so a
-Vercel deploy gives you solo mode only. Deploy `client/dist` there as a static
-site if a solo-only link is useful, and put the real game on Render or Fly.
-
-Split hosting works too — deploy `client/dist` as a static site and set
-`VITE_SERVER_URL` at build time to point at the Node server.
+**Not Vercel** — Socket.io needs a long-lived process, so a Vercel deploy gives
+you solo mode only.

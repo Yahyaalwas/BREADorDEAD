@@ -1,56 +1,21 @@
-// Shared game configuration. Imported by both the Vite client and the Node server,
-// so it must stay dependency-free ESM.
+// Sheeple — shared game configuration.
+// Imported by both the Vite client and the Node server, so: dependency-free ESM.
 
-export const WORLD = {
-  WIDTH: 1600,
-  HEIGHT: 1000,
-  // Bread is a slice: wider than tall, rounded.
-  BREAD_W: 54,
-  BREAD_H: 60,
-  BREAD_RADIUS: 27,
+export const GAME_NAME = 'Sheeple';
+
+export const WORLD = { WIDTH: 1800, HEIGHT: 1200, SHEEP_R: 26 };
+
+// Movement is deliberately plain and responsive: you push, you go. No inertia
+// games, no wobble — the fun is meant to come from the other players.
+export const MOVE = {
+  TICK_HZ: 30,
+  SPEED: 265,          // px/s
+  ACCEL: 2600,         // px/s^2, high enough to feel instant
+  FRICTION: 0.80,      // per tick when not pushing
+  WOLF_BONUS: 1.06,    // the wolf is a touch quicker, enough to matter in a chase
 };
 
-// The bread simulation. Bread does not walk: input applies torque, the slice
-// tilts, and the tilt is what drags it across the counter.
-export const PHYS = {
-  TICK_HZ: 30,             // server simulation rate
-  DT: 1 / 30,
-  TORQUE: 900,             // deg/s^2 applied by left/right
-  ANG_DAMP: 0.90,          // angular velocity decay per tick
-  ANG_MAX: 700,            // deg/s
-  THRUST: 1150,            // px/s^2 along the slice's facing
-  LIN_DAMP: 0.88,          // velocity decay per tick on a dry counter
-  MAX_SPEED: 320,
-  // Lean is how far the slice has flopped onto its side. It wobbles freely and
-  // is kicked by turning, hopping and collisions.
-  LEAN_SPRING: 18,        // pulls lean back toward upright
-  LEAN_DAMP: 0.965,
-  LEAN_FROM_TURN: 1.6,     // spin past SPIN_TIP and the slice tips over
-  SPIN_TIP: 250,           // deg/s of spin a slice can carry before it starts to topple
-  LEAN_MAX: 90,
-  FLAT_ANGLE: 45,          // |lean| beyond this and the slice is flat on the counter
-  FLAT_FRICTION: 0.80,     // extra damping while flat
-  FLAT_THRUST: 0.25,       // thrust multiplier while flat
-  // Hop
-  HOP_IMPULSE: 340,
-  HOP_COOLDOWN: 0.45,
-  GRAVITY_Z: 1250,
-  HOP_LEAN_KICK: 120,      // random lean kick on takeoff
-  HOP_SPIN_KICK: 260,      // random angular kick on takeoff
-  LAND_LEAN_KICK: 45,
-  // Carrying a crumb is heavy
-  CARRY_SPEED_MULT: 0.62,
-  CARRY_LEAN_BIAS: 12,
-};
-
-export const SURFACE = {
-  NORMAL:  { drag: PHYS.LIN_DAMP, speed: 1.0 },
-  BUTTER:  { drag: 0.995,         speed: 1.35 },  // slippery: almost no drag
-  WATER:   { drag: 0.80,          speed: 0.50 },  // soggy
-  MOLD:    { drag: 0.86,          speed: 0.80 },  // green crumbs
-};
-
-export const ROLE = { FRESH: 'fresh', MOLDY: 'moldy' };
+export const ROLE = { SHEEP: 'sheep', WOLF: 'wolf' };
 
 export const GAME_STATE = {
   LOBBY: 'lobby',
@@ -60,200 +25,161 @@ export const GAME_STATE = {
 };
 
 export const TIMING = {
-  ROUND_SECONDS: 60,
-  MEETING_SECONDS: 60,
-  VOTE_REVEAL_SECONDS: 6,
-  MAX_ROUNDS: 5,
-  KILL_HOLD_SECONDS: 2,
-  KILL_RANGE: 50,
-  TOAST_PERFECT: 3.0,
-  TOAST_WINDOW: 0.45,      // +/- tolerance around a perfect toast
-  TOAST_BURN: 6.0,
-  STACK_SECONDS: 5,
-  STACK_RADIUS: 96,
-  STACK_COUNT: 3,
-  COO_SECONDS: 2,
-  KNIFE_STUN_SECONDS: 10,
+  MEETING_SECONDS: 75,      // one timer for chat and voting together
+  REVEAL_SECONDS: 7,
+  EAT_RANGE: 78,
+  EAT_COOLDOWN: 42,
+  TUNNEL_COOLDOWN: 18,
+  TUNNEL_RANGE: 90,
+  FOG_COOLDOWN: 45,
+  FOG_SECONDS: 20,
+  REPORT_RANGE: 130,
+  CHORE_RANGE: 70,
+  CHORE_HOLD: 3.0,          // seconds for a hold-type chore
+  CHORE_TAPS: 8,            // taps for a tap-type chore
+  START_GRACE: 8,           // no eating for the first few seconds
 };
 
-export const ROOM = {
-  MIN_PLAYERS: 4,
-  MAX_PLAYERS: 8,
-  CODE_LENGTH: 4,
-  EMPTY_TTL_MS: 60_000,
+export const VISION = {
+  SHEEP: 330,
+  WOLF: 420,                // the wolf sees further; that is its edge
+  FOG: 165,
 };
 
-export const NET = {
-  BROADCAST_HZ: 20,
-  INPUT_HZ: 30,
-  INTERP_MS: 100,
-};
+export const ROOM = { MIN_PLAYERS: 4, MAX_PLAYERS: 10, CODE_LENGTH: 4, EMPTY_TTL_MS: 60_000 };
+
+export const NET = { BROADCAST_HZ: 20, INPUT_HZ: 30 };
 
 // ---------------------------------------------------------------------------
-// Kitchen map
+// The farm. Everything walkable is a rectangle; the union of them is the map.
+// Collision is "stay inside the union", which needs no wall geometry and cannot
+// trap a player in a corner.
 // ---------------------------------------------------------------------------
 
-// Rectangles are {x, y, w, h} with x/y being the top-left corner.
-export const ZONES = {
-  TOASTER:   { id: 'TOASTER',   x: 1120, y: 120, w: 240, h: 200, color: 0x8a8f98, label: 'TOASTER' },
-  BUTTER:    { id: 'BUTTER',    x: 220,  y: 660, w: 220, h: 170, color: 0xf5d76e, label: 'BUTTER' },
-  SINK:      { id: 'SINK',      x: 1140, y: 690, w: 340, h: 240, color: 0x4aa3df, label: 'SINK' },
-  BREADBOX:  { id: 'BREADBOX',  x: 150,  y: 130, w: 300, h: 210, color: 0xb07d4a, label: 'BREAD BOX' },
-  ANT_TRAIL: { id: 'ANT_TRAIL', x: 660,  y: 470, w: 560, h: 80,  color: 0x5a4632, label: 'ANT TRAIL' },
-  BOARD:     { id: 'BOARD',     x: 560,  y: 760, w: 420, h: 200, color: 0xc99a5b, label: 'CUTTING BOARD' },
+export const ROOMS = {
+  PASTURE: { id: 'PASTURE', name: 'Pasture',  x: 120,  y: 120, w: 420, h: 300, color: 0x6aa84f },
+  BARN:    { id: 'BARN',    name: 'Barn',     x: 700,  y: 80,  w: 400, h: 280, color: 0x9c4a3c },
+  POND:    { id: 'POND',    name: 'Pond',     x: 1260, y: 120, w: 420, h: 300, color: 0x3f7fa6 },
+  COOP:    { id: 'COOP',    name: 'Coop',     x: 120,  y: 760, w: 420, h: 300, color: 0xb08540 },
+  YARD:    { id: 'YARD',    name: 'Yard',     x: 700,  y: 820, w: 400, h: 280, color: 0x7a6a52 },
+  SHED:    { id: 'SHED',    name: 'Shed',     x: 1260, y: 760, w: 420, h: 300, color: 0x5c5f6b },
 };
 
-// Solid props the bread bumps into.
-export const OBSTACLES = [
-  { id: 'jar',    x: 780,  y: 180, w: 110, h: 110 },
-  { id: 'kettle', x: 380,  y: 430, w: 140, h: 120 },
+// Corridors give the map loops, which is what makes hiding and alibis work.
+// Each corridor overlaps the rooms it joins, so there is no seam to snag on,
+// and each is wide enough that walking into one does not need pixel alignment.
+// Each corridor reaches 70px INTO both rooms it joins. That matters: walkable
+// rectangles are deflated by the sheep radius, so an overlap smaller than two
+// radii would leave an impassable gap exactly at the doorway.
+export const CORRIDORS = [
+  { x: 470,  y: 205, w: 300, h: 110 },  // pasture -> barn
+  { x: 1030, y: 205, w: 300, h: 110 },  // barn    -> pond
+  { x: 265,  y: 350, w: 110, h: 480 },  // pasture -> coop
+  { x: 1405, y: 350, w: 110, h: 480 },  // pond    -> shed
+  { x: 845,  y: 290, w: 110, h: 600 },  // barn    -> yard
+  { x: 470,  y: 905, w: 300, h: 110 },  // coop    -> yard
+  { x: 1030, y: 905, w: 300, h: 110 },  // yard    -> shed
 ];
 
-// Where loose crumbs spawn.
-export const CRUMB_SPAWNS = [
-  { x: 620,  y: 260 },
-  { x: 1000, y: 640 },
-  { x: 300,  y: 880 },
-  { x: 1360, y: 430 },
-  { x: 860,  y: 900 },
-];
+export const WALKABLE = [...Object.values(ROOMS), ...CORRIDORS];
 
-// Ants walk this loop; bread can hitch a ride.
-export const ANT_PATH = [
-  { x: 700,  y: 510 },
-  { x: 1160, y: 510 },
-  { x: 1160, y: 620 },
-  { x: 700,  y: 620 },
-];
+export const SPAWN = { x: 900, y: 220 };
 
-export const ANT_SPEED = 90;
-export const ANT_RIDE_SPEED = 240;
+// The emergency bell: one meeting per player, and you have to walk to it.
+export const BELL = { x: 900, y: 130, r: 46 };
 
-export const KNIFE = {
-  // The butter knife patrols the cutting board.
-  A: { x: 590, y: 800 },
-  B: { x: 950, y: 920 },
-  SPEED: 210,
-  RADIUS: 46,
-};
-
-export const SPAWN_POINTS = [
-  { x: 700, y: 320 }, { x: 780, y: 380 }, { x: 860, y: 320 }, { x: 940, y: 380 },
-  { x: 700, y: 700 }, { x: 780, y: 640 }, { x: 860, y: 700 }, { x: 940, y: 640 },
+// Hay bales the wolf can dive into and pop out of somewhere else.
+export const HAY = [
+  { id: 'hay-pasture', x: 200, y: 380 },
+  { id: 'hay-barn',    x: 1040, y: 320 },
+  { id: 'hay-pond',    x: 1600, y: 380 },
+  { id: 'hay-coop',    x: 200, y: 820 },
+  { id: 'hay-yard',    x: 760, y: 880 },
+  { id: 'hay-shed',    x: 1600, y: 820 },
 ];
 
 // ---------------------------------------------------------------------------
-// Tasks
+// Chores
 // ---------------------------------------------------------------------------
 
-export const TASK = {
-  PERFECT_TOAST: 'PERFECT_TOAST',
-  CRUMB_DELIVERY: 'CRUMB_DELIVERY',
-  BREAD_STACK: 'BREAD_STACK',
-  COO: 'COO',
-  KNIFE_DASH: 'KNIFE_DASH',
-};
+export const CHORE_KIND = { HOLD: 'hold', TAP: 'tap' };
 
-export const TASK_DEFS = {
-  [TASK.PERFECT_TOAST]: {
-    id: TASK.PERFECT_TOAST,
-    name: 'Perfect Toast',
-    hint: 'Sit in the toaster for exactly 3 seconds. Six seconds is a funeral.',
-    zone: 'TOASTER',
-  },
-  [TASK.CRUMB_DELIVERY]: {
-    id: TASK.CRUMB_DELIVERY,
-    name: 'Crumbs to Ants',
-    hint: 'Grab a crumb (E) and drag it to the ant trail.',
-    zone: 'ANT_TRAIL',
-  },
-  [TASK.BREAD_STACK]: {
-    id: TASK.BREAD_STACK,
-    name: 'Bread Stack',
-    hint: 'Pile up with 2 other slices for 5 seconds.',
-    zone: null,
-  },
-  [TASK.COO]: {
-    id: TASK.COO,
-    name: 'Coo',
-    hint: 'Hold C for 2 seconds in the bread box. Inflate. Pop.',
-    zone: 'BREADBOX',
-  },
-  [TASK.KNIFE_DASH]: {
-    id: TASK.KNIFE_DASH,
-    name: 'Avoid the Knife',
-    hint: 'Cross the cutting board twice without getting spread.',
-    zone: 'BOARD',
-  },
-};
+export const CHORES = [
+  { id: 'milk',   name: 'Milk the cow',    room: 'BARN',    kind: CHORE_KIND.HOLD, x: 800,  y: 300, emoji: '🐄' },
+  { id: 'sweep',  name: 'Sweep the hay',   room: 'BARN',    kind: CHORE_KIND.TAP,  x: 1010, y: 150, emoji: '🧹' },
+  { id: 'count',  name: 'Count the sheep', room: 'PASTURE', kind: CHORE_KIND.TAP,  x: 220,  y: 200, emoji: '🔢' },
+  { id: 'fence',  name: 'Fix the fence',   room: 'PASTURE', kind: CHORE_KIND.HOLD, x: 450,  y: 360, emoji: '🔨' },
+  { id: 'boot',   name: 'Fish out a boot', room: 'POND',    kind: CHORE_KIND.HOLD, x: 1370, y: 250, emoji: '🥾' },
+  { id: 'ducks',  name: 'Count the ducks', room: 'POND',    kind: CHORE_KIND.TAP,  x: 1600, y: 180, emoji: '🦆' },
+  { id: 'eggs',   name: 'Collect eggs',    room: 'COOP',    kind: CHORE_KIND.TAP,  x: 380,  y: 830, emoji: '🥚' },
+  { id: 'feed',   name: 'Feed the hens',   room: 'COOP',    kind: CHORE_KIND.HOLD, x: 190,  y: 990, emoji: '🌾' },
+  { id: 'fuel',   name: 'Fuel the tractor',room: 'SHED',    kind: CHORE_KIND.HOLD, x: 1370, y: 900, emoji: '⛽' },
+  { id: 'tools',  name: 'Sort the tools',  room: 'SHED',    kind: CHORE_KIND.TAP,  x: 1610, y: 1000, emoji: '🔧' },
+  { id: 'crows',  name: 'Scare the crows', room: 'YARD',    kind: CHORE_KIND.TAP,  x: 780,  y: 900, emoji: '🐦' },
+  { id: 'wash',   name: 'Wash the trough', room: 'YARD',    kind: CHORE_KIND.HOLD, x: 1020, y: 1020, emoji: '🪣' },
+];
 
-export const TASKS_PER_PLAYER = 4;
+// Six each: the travel between stations is the real clock, and four made a
+// full game finish in under half a minute.
+export const CHORES_PER_PLAYER = 5;
 
 // ---------------------------------------------------------------------------
-// Moldy abilities
+// Look and feel
 // ---------------------------------------------------------------------------
 
-export const SABOTAGE = {
-  GREEN_CRUMBS: 'GREEN_CRUMBS',
-  SPORE_BURST: 'SPORE_BURST',
-  TOASTER: 'TOASTER',
-  FRAME: 'FRAME',
-  KILL: 'KILL',
-};
+export const WOOL_COLORS = [
+  { id: 'cream',  hex: 0xfff6e5, name: 'Cream' },
+  { id: 'pink',   hex: 0xffc2d4, name: 'Pink' },
+  { id: 'mint',   hex: 0xbdf0d2, name: 'Mint' },
+  { id: 'sky',    hex: 0xbcd9ff, name: 'Sky' },
+  { id: 'lemon',  hex: 0xffe9a3, name: 'Lemon' },
+  { id: 'lilac',  hex: 0xdcc6ff, name: 'Lilac' },
+  { id: 'peach',  hex: 0xffd0b0, name: 'Peach' },
+  { id: 'ash',    hex: 0xd8d8e0, name: 'Ash' },
+  { id: 'moss',   hex: 0xcfe3a8, name: 'Moss' },
+  { id: 'coal',   hex: 0xa9a3b5, name: 'Coal' },
+];
 
-export const SABOTAGE_DEFS = {
-  [SABOTAGE.GREEN_CRUMBS]: {
-    id: SABOTAGE.GREEN_CRUMBS, name: 'Green Crumbs', key: '1',
-    cooldown: 0, passive: true, duration: 10,
-    desc: 'Passive mold trail. Fresh bread that steps in it slows down.',
-  },
-  [SABOTAGE.SPORE_BURST]: {
-    id: SABOTAGE.SPORE_BURST, name: 'Spore Burst', key: '2',
-    cooldown: 30, radius: 220, duration: 5,
-    desc: 'Cloud of spores. Controls inverted for anyone caught in it.',
-  },
-  [SABOTAGE.TOASTER]: {
-    id: SABOTAGE.TOASTER, name: 'Crank the Toaster', key: '3',
-    cooldown: 45, evacuate: 10,
-    desc: 'Everyone has 10 seconds to leave the toaster or burn.',
-  },
-  [SABOTAGE.FRAME]: {
-    id: SABOTAGE.FRAME, name: 'Frame', key: '4',
-    cooldown: 20, range: 90, duration: 30,
-    desc: 'Rub mold on a nearby slice. They look guilty for 30 seconds.',
-  },
-  [SABOTAGE.KILL]: {
-    id: SABOTAGE.KILL, name: 'Kill', key: '5',
-    cooldown: 35, range: TIMING.KILL_RANGE, hold: TIMING.KILL_HOLD_SECONDS,
-    desc: 'Stay within 50px of a slice for 2 seconds. They become a crisp.',
-  },
-};
+// Hats are the whole personality budget. Keep them stupid.
+export const HATS = [
+  { id: 'none',    name: 'Bald' },
+  { id: 'cap',     name: 'Cap' },
+  { id: 'crown',   name: 'Crown' },
+  { id: 'party',   name: 'Party hat' },
+  { id: 'cowboy',  name: 'Cowboy' },
+  { id: 'bucket',  name: 'Bucket' },
+  { id: 'halo',    name: 'Halo' },
+  { id: 'horns',   name: 'Horns' },
+];
 
-export const MOLD_TRAIL = {
-  DROP_INTERVAL: 0.35,
-  LIFETIME: 10,
-  RADIUS: 34,
-  SLOW: 0.8,
-};
+export const SHEEP_NAMES = [
+  'Woolliam', 'Baabara', 'Lamb Chop', 'Sir Fluff', 'Mutton', 'Cloud',
+  'Shear Khan', 'Nugget', 'Ewe Two', 'Merino', 'Dolly', 'Sheepthoven',
+];
+
+// Canned lines for the chat, so a phone player can talk with one thumb.
+export const QUICK_CHAT = [
+  'Where?', 'With me the whole time', 'I saw {n} near the body',
+  '{n} did nothing all game', 'Skip', 'It is 100% {n}',
+  'I was doing chores', 'Vote {n}', 'Not me!!',
+];
 
 // ---------------------------------------------------------------------------
 // Socket protocol
 // ---------------------------------------------------------------------------
 
 export const EV = {
-  // client -> server
   ROOM_CREATE: 'room:create',
   ROOM_JOIN: 'room:join',
   ROOM_LEAVE: 'room:leave',
   ROOM_START: 'room:start',
+  ROOM_CUSTOMIZE: 'room:customize',
+
   PLAYER_MOVE: 'player:move',
-  PLAYER_TASK: 'player:task',
-  PLAYER_SABOTAGE: 'player:sabotage',
-  PLAYER_MEETING: 'player:meeting',
+  PLAYER_ACTION: 'player:action',
   PLAYER_VOTE: 'player:vote',
   PLAYER_CHAT: 'player:chat',
 
-  // server -> client
   ROOM_STATE: 'room:state',
   ROOM_ERROR: 'room:error',
   GAME_START: 'game:start',
@@ -262,19 +188,8 @@ export const EV = {
   GAME_OVER: 'game:over',
   PLAYER_JOINED: 'player:joined',
   PLAYER_LEFT: 'player:left',
-  PLAYER_DIED: 'player:died',
   MEETING_CALLED: 'meeting:called',
-  MEETING_VOTE_UPDATE: 'meeting:voteUpdate',
   MEETING_CHAT: 'meeting:chat',
+  MEETING_VOTE_UPDATE: 'meeting:voteUpdate',
   MEETING_RESULT: 'meeting:result',
 };
-
-export const BREAD_COLORS = [
-  0xfff3d6, 0xffd9a0, 0xf7c59f, 0xe8b98a,
-  0xffe8b0, 0xf2d0b0, 0xffdfc4, 0xead2ac,
-];
-
-export const BREAD_NAMES = [
-  'Sourdough', 'Rye', 'Brioche', 'Focaccia',
-  'Baguette', 'Ciabatta', 'Pumpernickel', 'Challah',
-];

@@ -1,6 +1,6 @@
 # fly.toml — `fly launch --copy-config` then `fly deploy`.
 # Pick the region nearest your players: bom (Mumbai) is the closest to the Gulf.
-app = "bread-or-dead"
+app = "sheeple"
 primary_region = "bom"
 
 [build]

@@ -1,7 +1,7 @@
 // Fixed-timestep driver. Simulation runs at PHYS.TICK_HZ; snapshots go out at
 // NET.BROADCAST_HZ so we are not shipping 30 full states a second.
 
-import { PHYS, NET } from '../../shared/constants.js';
+import { MOVE, NET } from '../../shared/constants.js';
 
 export class GameLoop {
   constructor({ onTick, onBroadcast }) {
@@ -11,14 +11,14 @@ export class GameLoop {
     this.last = 0;
     this.accumulator = 0;
     this.broadcastAcc = 0;
-    this.step = 1 / PHYS.TICK_HZ;
+    this.step = 1 / MOVE.TICK_HZ;
     this.broadcastStep = 1 / NET.BROADCAST_HZ;
   }
 
   start() {
     if (this.timer) return;
     this.last = Date.now();
-    this.timer = setInterval(() => this.frame(), 1000 / PHYS.TICK_HZ);
+    this.timer = setInterval(() => this.frame(), 1000 / MOVE.TICK_HZ);
   }
 
   stop() {

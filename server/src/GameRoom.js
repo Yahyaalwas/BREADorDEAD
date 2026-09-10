@@ -2,7 +2,7 @@
 
 import { GameSim } from '../../shared/GameSim.js';
 import { GameLoop } from './GameLoop.js';
-import { EV, GAME_STATE, ROOM, TIMING } from '../../shared/constants.js';
+import { EV, GAME_STATE, ROOM } from '../../shared/constants.js';
 
 export class GameRoom {
   constructor(code, io, onEmpty) {
@@ -30,12 +30,15 @@ export class GameRoom {
 
   add(player) {
     if (this.isFull) return { ok: false, error: 'Room is full (8 slices max).' };
-    if (this.inProgress) return { ok: false, error: 'That game is already in the oven.' };
+    if (this.inProgress) return { ok: false, error: 'That game has already started.' };
 
     this.players.set(player.id, player);
     player.roomCode = this.code;
     if (!this.hostId) { this.hostId = player.id; player.isHost = true; }
-    this.sim.addPlayer({ id: player.id, name: player.name });
+    this.sim.addPlayer({
+      id: player.id, name: player.name,
+      colorIndex: player.colorIndex, hatIndex: player.hatIndex,
+    });
     this.emptySince = null;
 
     player.socket.join(this.code);
@@ -79,7 +82,14 @@ export class GameRoom {
       state: this.sim.state,
       minPlayers: ROOM.MIN_PLAYERS,
       maxPlayers: ROOM.MAX_PLAYERS,
-      players: [...this.players.values()].map((p) => p.toLobbyJSON()),
+      players: [...this.players.values()].map((p) => {
+        const sp = this.sim.players.get(p.id);
+        return {
+          ...p.toLobbyJSON(),
+          colorIndex: sp ? sp.colorIndex : p.colorIndex,
+          hatIndex: sp ? sp.hatIndex : p.hatIndex,
+        };
+      }),
     };
   }
 
@@ -97,7 +107,7 @@ export class GameRoom {
   start(byId) {
     if (byId !== this.hostId) return { ok: false, error: 'Only the host can start.' };
     if (this.size < ROOM.MIN_PLAYERS) {
-      return { ok: false, error: `Need at least ${ROOM.MIN_PLAYERS} slices.` };
+      return { ok: false, error: `Need at least ${ROOM.MIN_PLAYERS} sheep.` };
     }
     if (this.inProgress) return { ok: false, error: 'Already playing.' };
     this.sim.start();
@@ -115,6 +125,19 @@ export class GameRoom {
 
   handleAction(playerId, action) {
     this.sim.action(playerId, action);
+  }
+
+  handleCustomize(playerId, profile) {
+    const p = this.players.get(playerId);
+    if (!p) return;
+    this.sim.customize(playerId, profile);
+    const simP = this.sim.players.get(playerId);
+    if (simP) {
+      p.name = simP.name;
+      p.colorIndex = simP.colorIndex;
+      p.hatIndex = simP.hatIndex;
+    }
+    this.broadcastLobby();
   }
 
   handleVote(playerId, targetId) {
@@ -144,9 +167,6 @@ export class GameRoom {
 
   routeEvent(ev) {
     switch (ev.type) {
-      case 'player:died':
-        this.io.to(this.code).emit(EV.PLAYER_DIED, ev);
-        break;
       case 'meeting:called':
         this.io.to(this.code).emit(EV.MEETING_CALLED, ev);
         break;

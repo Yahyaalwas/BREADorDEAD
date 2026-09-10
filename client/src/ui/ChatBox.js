@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 
-/** Meeting chat. Dead bread can read but the living never see them type. */
+/** Meeting chat. Ghosts can read the room but the living never see them type. */
 export class ChatBox {
   constructor(onSend) {
     this.log = $('chat-log');
@@ -24,7 +24,7 @@ export class ChatBox {
   setEnabled(enabled, placeholder) {
     this.input.disabled = !enabled;
     this.form.querySelector('button').disabled = !enabled;
-    this.input.placeholder = placeholder || (enabled ? 'Say something breadful…' : 'Ghost crumbs cannot speak.');
+    this.input.placeholder = placeholder || (enabled ? 'Accuse someone…' : 'Ghost sheep cannot speak.');
   }
 
   system(text) {

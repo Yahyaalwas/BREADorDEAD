@@ -1,67 +1,58 @@
 import Phaser from 'phaser';
-import { KitchenMap } from '../KitchenMap.js';
-import Bread from '../entities/Bread.js';
-import MoldyBread from '../entities/MoldyBread.js';
-import { WORLD, SPAWN_POINTS } from '../../../shared/constants.js';
-import { createBreadState, stepBread } from '../../../shared/physics.js';
+import { FarmMap } from '../FarmMap.js';
+import Sheep from '../entities/Sheep.js';
+import { WORLD, CHORES, WOOL_COLORS, HATS } from '../../../shared/constants.js';
+import { createBody, stepBody, findPath } from '../../../shared/movement.js';
 
-/**
- * Attract mode behind the DOM menu: a few slices flopping around an empty
- * kitchen so the physics sells itself before anyone presses a key.
- */
+/** Attract mode behind the menu: sheep wandering the farm, minding nothing. */
 export default class MenuScene extends Phaser.Scene {
   constructor() { super('Menu'); }
 
   create() {
-    this.map = new KitchenMap(this);
-    this.cameras.main.setBounds(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
-    this.cameras.main.centerOn(WORLD.WIDTH / 2, WORLD.HEIGHT / 2);
-    this.cameras.main.setZoom(Math.max(
-      this.scale.width / WORLD.WIDTH, this.scale.height / WORLD.HEIGHT) * 0.95);
+    this.map = new FarmMap(this);
+    const cam = this.cameras.main;
+    cam.setBounds(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
+    cam.setZoom(Math.max(this.scale.width / WORLD.WIDTH, this.scale.height / WORLD.HEIGHT) * 1.15);
+    cam.centerOn(WORLD.WIDTH / 2, WORLD.HEIGHT / 2);
+    this.tweens.add({
+      targets: cam, scrollX: '+=120', scrollY: '+=60',
+      duration: 12000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
 
     this.demo = [];
-    for (let i = 0; i < 5; i++) {
-      const spawn = SPAWN_POINTS[i];
-      const Cls = i === 2 ? MoldyBread : Bread;
-      const bread = new Cls(this, spawn.x, spawn.y, {
-        id: `demo${i}`, name: '', colorIndex: i, isLocal: false,
+    for (let i = 0; i < 6; i++) {
+      const spot = CHORES[i % CHORES.length];
+      const body = createBody(spot.x, spot.y);
+      const sheep = new Sheep(this, body.x, body.y, {
+        id: `demo${i}`, name: '', colorIndex: i % WOOL_COLORS.length,
+        hatIndex: (i + 1) % HATS.length,
       });
-      bread.label.setVisible(false);
-      this.demo.push({
-        bread,
-        state: createBreadState(spawn.x, spawn.y, Math.random() * 360),
-        input: { left: false, right: false, forward: true, back: false, hop: false },
-        timer: 0,
-        role: i === 2 ? 'moldy' : 'fresh',
-      });
+      sheep.label.setVisible(false);
+      this.demo.push({ sheep, body, path: [], wait: Math.random() * 2 });
     }
-
-    this.cameras.main.pan(WORLD.WIDTH / 2, WORLD.HEIGHT / 2, 1);
-    this.tweens.add({
-      targets: this.cameras.main, scrollX: '+=60', duration: 9000,
-      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-    });
   }
 
   update(time, delta) {
     const dt = Math.min(delta / 1000, 0.05);
     for (const d of this.demo) {
-      d.timer -= dt;
-      if (d.timer <= 0) {
-        d.timer = 0.5 + Math.random() * 1.5;
-        d.input = {
-          left: Math.random() < 0.4,
-          right: Math.random() < 0.4,
-          forward: Math.random() < 0.8,
-          back: false,
-          hop: Math.random() < 0.35,
-        };
+      d.wait -= dt;
+      if (!d.path.length && d.wait <= 0) {
+        const to = CHORES[Math.floor(Math.random() * CHORES.length)];
+        d.path = findPath(d.body.x, d.body.y, to.x, to.y);
+        d.wait = 1 + Math.random() * 3;
       }
-      stepBread(d.state, d.input, dt, {});
-      d.bread.sync({
-        ...d.state, id: d.bread.playerId, alive: true, role: d.role,
-        toastLevel: 0, framed: false, stunned: false, puff: 0,
-      }, dt);
+      let input = { dx: 0, dy: 0 };
+      if (d.path.length) {
+        const wp = d.path[0];
+        const dx = wp.x - d.body.x, dy = wp.y - d.body.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 40) d.path.shift();
+        else input = { dx: dx / dist, dy: dy / dist };
+      }
+      stepBody(d.body, input, dt, {});
+      d.sheep.sync({ ...d.body, alive: true, role: null, busy: false,
+        colorIndex: d.sheep.colorIndex, hatIndex: d.sheep.hatIndex }, dt);
+      d.sheep.label.setVisible(false);
     }
   }
 }

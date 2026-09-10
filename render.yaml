@@ -2,7 +2,7 @@
 # the same Express process that runs the game rooms.
 services:
   - type: web
-    name: bread-or-dead
+    name: sheeple
     runtime: node
     plan: free
     region: frankfurt          # oregon | ohio | frankfurt | singapore

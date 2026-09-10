@@ -84,8 +84,8 @@ app.get(/^(?!\/(api|socket\.io|health)).*/, (_req, res) => {
 // --- Sockets ----------------------------------------------------------------
 
 io.on('connection', (socket) => {
-  socket.on(EV.ROOM_CREATE, ({ name } = {}, ack) => {
-    const player = new Player(socket, name);
+  socket.on(EV.ROOM_CREATE, (profile = {}, ack) => {
+    const player = new Player(socket, profile);
     players.set(socket.id, player);
     const code = makeCode();
     const room = getOrCreateRoom(code);
@@ -93,7 +93,8 @@ io.on('connection', (socket) => {
     if (typeof ack === 'function') ack({ ...result, code, id: socket.id });
   });
 
-  socket.on(EV.ROOM_JOIN, ({ name, code } = {}, ack) => {
+  socket.on(EV.ROOM_JOIN, (payload = {}, ack) => {
+    const { code, ...profile } = payload;
     const clean = String(code || '').toUpperCase().trim();
     const room = rooms.get(clean);
     if (!room) {
@@ -104,10 +105,12 @@ io.on('connection', (socket) => {
     }
     let player = players.get(socket.id);
     if (!player) {
-      player = new Player(socket, name);
+      player = new Player(socket, profile);
       players.set(socket.id, player);
     } else {
-      player.name = (name || player.name).trim().slice(0, 14) || player.name;
+      player.name = (profile.name || player.name).trim().slice(0, 12) || player.name;
+      if (Number.isInteger(profile.colorIndex)) player.colorIndex = profile.colorIndex;
+      if (Number.isInteger(profile.hatIndex)) player.hatIndex = profile.hatIndex;
       leaveCurrentRoom(player);
     }
     const result = room.add(player);
@@ -141,14 +144,11 @@ io.on('connection', (socket) => {
 
   socket.on(EV.PLAYER_MOVE, withRoom((room, input) => room.handleMove(socket.id, input)));
 
-  socket.on(EV.PLAYER_TASK, withRoom((room, data) =>
-    room.handleAction(socket.id, { type: data.action || 'pickup', taskId: data.taskId })));
+  socket.on(EV.PLAYER_ACTION, withRoom((room, action) =>
+    room.handleAction(socket.id, action)));
 
-  socket.on(EV.PLAYER_SABOTAGE, withRoom((room, data) =>
-    room.handleAction(socket.id, { type: 'sabotage', ability: data.abilityId, targetId: data.targetId })));
-
-  socket.on(EV.PLAYER_MEETING, withRoom((room, data) =>
-    room.handleAction(socket.id, { type: data.type === 'body' ? 'report' : 'scream' })));
+  socket.on(EV.ROOM_CUSTOMIZE, withRoom((room, profile) =>
+    room.handleCustomize(socket.id, profile)));
 
   socket.on(EV.PLAYER_VOTE, withRoom((room, data) => room.handleVote(socket.id, data.targetId)));
 
@@ -187,7 +187,7 @@ function lanAddresses() {
 // what a phone on the same Wi-Fi needs, and it does not fight port forwarders
 // that have already claimed IPv4 0.0.0.0.
 server.listen(PORT, () => {
-  console.log(`🍞 Bread or Dead server listening on http://localhost:${PORT}`);
+  console.log(`🐑 Sheeple server listening on http://localhost:${PORT}`);
   for (const address of lanAddresses()) {
     console.log(`   on this network:            http://${address}:${PORT}`);
   }
